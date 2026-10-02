@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ชื่อของคุณ | ช่างภาพรถ</title>
+<meta name="description" content="ผลงานถ่ายรถ สนามและถนน ภาพนิ่งและวิดีโอ">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Noto+Sans+Thai:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#1d2329;--panel:#262d34;--ink:#eceef0;--mute:#9aa4ad;--red:#e03a3e;--line:#38414a}
+*{box-sizing:border-box;margin:0}
+html{background:var(--bg);color:var(--ink);font-family:"Noto Sans Thai",system-ui,sans-serif;line-height:1.6}
+body{min-height:100vh}
+/* kerb stripe: the one signature element */
+.kerb{height:12px;background:repeating-linear-gradient(135deg,var(--red) 0 16px,#f4f4f2 16px 32px)}
+header{padding:48px 24px 24px;max-width:1280px;margin:0 auto}
+h1{font:700 clamp(44px,9vw,104px)/.95 "Barlow Condensed","Noto Sans Thai",sans-serif;letter-spacing:.01em}
+.tag{color:var(--mute);margin-top:12px;max-width:52ch}
+.links{margin-top:16px;display:flex;gap:20px;flex-wrap:wrap}
+.links a{color:var(--ink);text-decoration-color:var(--red);text-underline-offset:4px}
+nav{max-width:1280px;margin:0 auto;padding:8px 24px 24px;display:flex;gap:8px;flex-wrap:wrap}
+nav button{background:none;border:1px solid var(--line);color:var(--ink);padding:6px 16px;border-radius:999px;font:inherit;cursor:pointer}
+nav button[aria-pressed="true"]{background:var(--red);border-color:var(--red)}
+nav button:hover{border-color:var(--ink)}
+:focus-visible{outline:2px solid #fff;outline-offset:3px}
+main{max-width:1280px;margin:0 auto;padding:0 24px 64px}
+.grid{columns:3 280px;column-gap:12px}
+.item{display:block;width:100%;padding:0;border:0;background:var(--panel);margin:0 0 12px;break-inside:avoid;position:relative;cursor:pointer;border-radius:2px;overflow:hidden}
+.item img{display:block;width:100%;height:auto}
+.item .play{position:absolute;right:10px;top:10px;background:rgba(0,0,0,.65);color:#fff;font-size:12px;padding:2px 10px;border-radius:999px}
+.item:hover img{filter:brightness(1.08)}
+.msg{color:var(--mute);padding:48px 0}
+dialog{border:0;padding:0;background:var(--panel);color:var(--ink);max-width:min(1000px,94vw);width:100%;max-height:92vh;border-radius:4px;overflow:auto}
+dialog::backdrop{background:rgba(10,12,14,.86)}
+dialog img,dialog video{display:block;width:100%;max-height:72vh;object-fit:contain;background:#000}
+.cap{padding:16px 20px 20px}
+.cap p{white-space:pre-line;max-width:70ch;color:var(--mute);margin-bottom:10px}
+.cap a{color:var(--ink);text-underline-offset:4px;text-decoration-color:var(--red)}
+.close{position:absolute;right:10px;top:10px;background:rgba(0,0,0,.7);color:#fff;border:0;border-radius:999px;padding:4px 14px;font:inherit;cursor:pointer;z-index:1}
+footer{border-top:1px solid var(--line);color:var(--mute);padding:24px;text-align:center;font-size:14px}
+</style>
+</head>
+<body>
+<div class="kerb" aria-hidden="true"></div>
+<header>
+  <h1 id="name"></h1>
+  <p class="tag" id="tagline"></p>
+  <div class="links" id="links"></div>
+</header>
+<nav id="filters" aria-label="กรองผลงาน"></nav>
+<main>
+  <div class="grid" id="grid"></div>
+  <p class="msg" id="msg">กำลังโหลดผลงาน…</p>
+</main>
+<footer id="foot"></footer>
+
+<dialog id="dlg">
+  <button class="close" id="close">ปิด</button>
+  <div id="media"></div>
+  <div class="cap"><p id="cap"></p><a id="ig" target="_blank" rel="noopener">ดูโพสต์บนไอจี</a></div>
+</dialog>
+
+<script>
+// ===== แก้ตรงนี้ =====
+const CONFIG = {
+  name: "ชื่อของคุณ",
+  tagline: "ถ่ายรถทุกแบบ ทั้งในสนามและบนถนน ภาพนิ่งและวิดีโอ",
+  igUser: "your_instagram",          // ชื่อไอจี (ไม่ต้องใส่ @)
+  email: "you@example.com",           // เว้นว่างได้
+  // หมวดที่กรองจากแฮชแท็กในแคปชั่นของโพสต์ แก้หรือลบได้
+  categories: [
+    { label: "สนาม", tag: "#track" },
+    { label: "ถนน", tag: "#street" }
+  ]
+};
+// =====================
+
+const $ = s => document.querySelector(s);
+const state = { posts: [], type: "all", tag: null };
+
+$("#name").textContent = CONFIG.name;
+$("#tagline").textContent = CONFIG.tagline;
+$("#foot").textContent = `© ${new Date().getFullYear()} ${CONFIG.name}`;
+$("#links").innerHTML =
+  `<a href="https://instagram.com/${CONFIG.igUser}" target="_blank" rel="noopener">Instagram @${CONFIG.igUser}</a>` +
+  (CONFIG.email ? `<a href="mailto:${CONFIG.email}">${CONFIG.email}</a>` : "");
+
+const filters = [
+  { label: "ทั้งหมด", type: "all" },
+  { label: "ภาพนิ่ง", type: "photo" },
+  { label: "วิดีโอ", type: "video" },
+  ...CONFIG.categories.map(c => ({ label: c.label, tag: c.tag.toLowerCase() }))
+];
+
+function buildFilters() {
+  $("#filters").innerHTML = "";
+  filters.forEach((f, i) => {
+    const b = document.createElement("button");
+    b.textContent = f.label;
+    b.setAttribute("aria-pressed", String(i === 0));
+    b.onclick = () => {
+      state.type = f.type || "all";
+      state.tag = f.tag || null;
+      [...$("#filters").children].forEach((x, j) => x.setAttribute("aria-pressed", String(i === j)));
+      render();
+    };
+    $("#filters").appendChild(b);
+  });
+}
+
+function matches(p) {
+  const isVideo = p.media_type === "VIDEO";
+  if (state.type === "photo" && isVideo) return false;
+  if (state.type === "video" && !isVideo) return false;
+  if (state.tag && !(p.caption || "").toLowerCase().includes(state.tag)) return false;
+  return true;
+}
+
+function render() {
+  const list = state.posts.filter(matches);
+  const grid = $("#grid");
+  grid.innerHTML = "";
+  list.forEach(p => {
+    const b = document.createElement("button");
+    b.className = "item";
+    b.setAttribute("aria-label", (p.caption || "ผลงาน").slice(0, 80));
+    const src = p.media_type === "VIDEO" ? (p.thumbnail_url || "") : p.media_url;
+    b.innerHTML = `<img loading="lazy" alt="" src="${src}">` + (p.media_type === "VIDEO" ? `<span class="play">วิดีโอ</span>` : "");
+    b.onclick = () => openPost(p);
+    grid.appendChild(b);
+  });
+  $("#msg").textContent = list.length ? "" : "ยังไม่มีผลงานในหมวดนี้";
+}
+
+function openPost(p) {
+  const m = $("#media");
+  m.innerHTML = "";
+  if (p.media_type === "VIDEO") {
+    const v = document.createElement("video");
+    v.src = p.media_url; v.controls = true; v.autoplay = true; v.playsInline = true;
+    if (p.thumbnail_url) v.poster = p.thumbnail_url;
+    m.appendChild(v);
+  } else {
+    const i = document.createElement("img");
+    i.src = p.media_url; i.alt = p.caption || "";
+    m.appendChild(i);
+  }
+  $("#cap").textContent = p.caption || "";
+  $("#ig").href = p.permalink;
+  $("#dlg").showModal();
+}
+
+$("#close").onclick = () => $("#dlg").close();
+$("#dlg").addEventListener("close", () => { $("#media").innerHTML = ""; });
+$("#dlg").addEventListener("click", e => { if (e.target === $("#dlg")) $("#dlg").close(); });
+
+buildFilters();
+fetch("/api/instagram")
+  .then(r => r.json().then(d => ({ ok: r.ok, d })))
+  .then(({ ok, d }) => {
+    if (!ok) throw new Error(d.error || "error");
+    state.posts = d.posts;
+    $("#msg").textContent = "";
+    render();
+  })
+  .catch(() => { $("#msg").textContent = "โหลดผลงานไม่สำเร็จ ลองรีเฟรชหน้านี้อีกครั้ง"; });
+</script>
+</body>
+</html>
